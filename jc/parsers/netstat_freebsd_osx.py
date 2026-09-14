@@ -65,17 +65,18 @@ def parse_post(raw_data):
                 entry['name'] = entry['name'].strip()
 
         # create network and transport protocol fields
+        # Addresses without a '.' separator are left alone rather than split.
+        # Not every section that reaches here uses dotted address.port notation
+        # (VSock uses cid:port), and an unsplittable address should not raise.
         if 'local_address' in entry:
-            if entry['local_address']:
-                ladd = entry['local_address'].rsplit('.', maxsplit=1)[0]
-                lport = entry['local_address'].rsplit('.', maxsplit=1)[1]
+            if entry['local_address'] and '.' in entry['local_address']:
+                ladd, lport = entry['local_address'].rsplit('.', maxsplit=1)
                 entry['local_address'] = ladd
                 entry['local_port'] = lport
 
         if 'foreign_address' in entry:
-            if entry['foreign_address']:
-                fadd = entry['foreign_address'].rsplit('.', maxsplit=1)[0]
-                fport = entry['foreign_address'].rsplit('.', maxsplit=1)[1]
+            if entry['foreign_address'] and '.' in entry['foreign_address']:
+                fadd, fport = entry['foreign_address'].rsplit('.', maxsplit=1)
                 entry['foreign_address'] = fadd
                 entry['foreign_port'] = fport
 
@@ -157,6 +158,7 @@ def parse(cleandata):
     active_kernel_control = False
     routing_table = False
     interface_table = False
+    vsock = False
 
     for line in cleandata:
 
@@ -169,6 +171,7 @@ def parse(cleandata):
             active_kernel_control = False
             routing_table = False
             interface_table = False
+            vsock = False
             continue
 
         if line.startswith('Active Multipath Internet connections'):
@@ -180,6 +183,7 @@ def parse(cleandata):
             active_kernel_control = False
             routing_table = False
             interface_table = False
+            vsock = False
             continue
 
         if line.startswith('Active LOCAL (UNIX) domain sockets') or line.startswith('Active UNIX domain sockets'):
@@ -191,6 +195,7 @@ def parse(cleandata):
             active_kernel_control = False
             routing_table = False
             interface_table = False
+            vsock = False
             continue
 
         if line.startswith('Registered kernel control modules'):
@@ -202,6 +207,7 @@ def parse(cleandata):
             active_kernel_control = False
             routing_table = False
             interface_table = False
+            vsock = False
             continue
 
         if line.startswith('Active kernel event sockets'):
@@ -213,6 +219,19 @@ def parse(cleandata):
             active_kernel_control = False
             routing_table = False
             interface_table = False
+            vsock = False
+            continue
+
+        if line.startswith('Active VSock sockets'):
+            network = False
+            multipath = False
+            socket = False
+            reg_kernel_control = False
+            active_kernel_event = False
+            active_kernel_control = False
+            routing_table = False
+            interface_table = False
+            vsock = True
             continue
 
         if line.startswith('Active kernel control sockets'):
@@ -224,6 +243,7 @@ def parse(cleandata):
             active_kernel_control = True
             routing_table = False
             interface_table = False
+            vsock = False
             continue
 
         if line.startswith('Routing tables'):
@@ -274,6 +294,11 @@ def parse(cleandata):
             headers = header_text.split()
             continue
 
+        if vsock and line.startswith('Proto '):
+            header_text = normalize_headers(line)
+            headers = header_text.split()
+            continue
+
         if routing_table and line.startswith('Destination '):
             header_text = normalize_route_headers(line)
             headers = header_text.split()
@@ -307,6 +332,10 @@ def parse(cleandata):
 
         if active_kernel_control:
             raw_output.append(parse_item(headers, line, 'Active kernel control socket'))
+            continue
+
+        if vsock:
+            raw_output.append(parse_item(headers, line, 'vsock'))
             continue
 
         if routing_table and not (line.startswith('Internet:') or line.startswith('Internet6:')):

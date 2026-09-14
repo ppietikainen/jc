@@ -58,6 +58,9 @@ class MyTests(unittest.TestCase):
     with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/osx-10.14.6/netstat-Abn.out'), 'r', encoding='utf-8') as f:
         osx_14_6_netstat_Abn = f.read()
 
+    with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/osx-26.6.2/netstat-an.out'), 'r', encoding='utf-8') as f:
+        osx_26_6_2_netstat_an = f.read()
+
     with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/freebsd12/netstat-Aa.out'), 'r', encoding='utf-8') as f:
         freebsd12_netstat_Aa = f.read()
 
@@ -187,6 +190,9 @@ class MyTests(unittest.TestCase):
 
     with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/osx-10.14.6/netstat-Abn.json'), 'r', encoding='utf-8') as f:
         osx_14_6_netstat_Abn_json = json.loads(f.read())
+
+    with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/osx-26.6.2/netstat-an.json'), 'r', encoding='utf-8') as f:
+        osx_26_6_2_netstat_an_json = json.loads(f.read())
 
     with open(os.path.join(THIS_DIR, os.pardir, 'tests/fixtures/freebsd12/netstat-Aa.json'), 'r', encoding='utf-8') as f:
         freebsd12_netstat_Aa_json = json.loads(f.read())
@@ -520,6 +526,19 @@ class MyTests(unittest.TestCase):
         Test 'netstat -aonb' on Windows
         """
         self.assertEqual(jc.parsers.netstat.parse(self.windows_netstat_aonb, quiet=True), self.windows_netstat_aonb_json)
+
+    def test_netstat_an_osx_26_6_2(self):
+        """
+        Test 'netstat -an' on macOS 26.6.2
+
+        Covers two sections that did not exist in the 10.x captures: the
+        VSock section (present on any macOS guest, so on every hosted CI
+        runner) whose addresses are cid:port rather than address.port, and
+        Multipath. Before VSock was recognized its header was claimed by the
+        preceding section and its rows raised IndexError in parse_post.
+        """
+        self.assertEqual(jc.parsers.netstat.parse(self.osx_26_6_2_netstat_an, quiet=True), self.osx_26_6_2_netstat_an_json)
+
 
 if __name__ == '__main__':
     unittest.main()
