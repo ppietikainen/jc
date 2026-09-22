@@ -20,8 +20,10 @@ protocol-specific fields such as ICMP `type`/`code`/`id` and GRE
 Hyphens in field names become underscores, so the `delta-time` printed when
 `net.netfilter.nf_conntrack_timestamp` is enabled becomes `delta_time`. With
 `-o ktimestamp` the flow start and stop times are printed as `[start=...]`
-and `[stop=...]`; both are `ctime()` strings and are kept as strings. GRE
-keys are printed in hex and are converted from base 16.
+and `[stop=...]`; both are `ctime()` strings, kept as strings and also
+converted to `start_epoch`/`stop_epoch`. Those are naive, i.e. based on the
+local time of the system the parser is run on, which is the system that
+printed them. GRE keys are printed in hex and are converted from base 16.
 
 With `-o extended` the address family is printed before the protocol
 (`ipv4 2 tcp ...`), which populates `family` and `family_number`. With
@@ -157,6 +159,9 @@ _int_keys = {
     'packets', 'bytes', 'mark', 'use', 'portid', 'zone', 'delta_time'
 }
 
+# `-o ktimestamp` prints these as ctime() strings, which is format hint 1000
+_date_keys = {'start', 'stop'}
+
 # GRE is the one protocol whose tuple fields conntrack prints in hex
 # (`srckey=0x%x`), which convert_to_int() would read as a decimal
 _hex_keys = {'srckey', 'dstkey'}
@@ -187,7 +192,7 @@ def _process(proc_data: List[JSONDictType]) -> List[JSONDictType]:
         List of Dictionaries. Structured to conform to the schema.
     """
     for entry in proc_data:
-        for key, value in entry.items():
+        for key, value in entry.copy().items():
             if key == 'status':
                 continue
 
@@ -201,6 +206,11 @@ def _process(proc_data: List[JSONDictType]) -> List[JSONDictType]:
                 if key.startswith(prefix):
                     base_key = key[len(prefix):]
                     break
+
+            if base_key in _date_keys:
+                dt = jc.utils.timestamp(value, format_hint=(1000,))
+                entry[key + '_epoch'] = dt.naive
+                continue
 
             if base_key in _hex_keys:
                 entry[key] = _convert_hex(value)
